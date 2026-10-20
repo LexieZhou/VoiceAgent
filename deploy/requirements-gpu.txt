@@ -1,0 +1,5 @@
+vllm[audio]
+kokoro>=0.9.4
+fastapi
+uvicorn
+soundfile

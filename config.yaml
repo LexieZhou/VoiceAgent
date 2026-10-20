@@ -1,0 +1,62 @@
+# Voice agent configuration. ${VAR} / ${VAR:-default} are read from the environment (.env).
+#
+# provider values:
+#   openai_compatible  self-hosted server (vLLM, SGLang, Kokoro server); base_url required
+#   openai             OpenAI cloud API (uses OPENAI_API_KEY); handy before the GPU is up
+
+server:
+  host: localhost
+  port: 7860
+
+vad:
+  provider: silero
+  confidence: 0.7
+  start_secs: 0.2      # speech needed before "user started speaking" (also barge-in latency)
+  stop_secs: 0.2       # silence before VAD reports a pause; smart turn decides if the turn ended
+  min_volume: 0.6
+
+turn:
+  provider: smart_turn_v3   # or "none": end turn after `speech_timeout` seconds of silence
+  stop_secs: 3.0            # max silence before ending the turn even if the model says "incomplete"
+  speech_timeout: 0.6       # only used when provider is "none"
+
+stt:
+  provider: openai_compatible
+  base_url: ${STT_BASE_URL}
+  api_key: ${VLLM_API_KEY:-}
+  model: openai/whisper-large-v3-turbo
+  language: en
+  ttfs_p99_latency: 1.0
+
+llm:
+  provider: openai_compatible
+  base_url: ${LLM_BASE_URL}          # point at SGLang instead by changing this URL
+  api_key: ${VLLM_API_KEY:-}
+  model: Qwen/Qwen3-8B
+  temperature: 0.7
+  max_tokens: 300
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: false        # Qwen3 reasoning adds seconds of latency
+  system_prompt: >-
+    You are a friendly voice assistant. Your replies are spoken aloud, so keep them
+    short and conversational (one to three sentences), and never use markdown,
+    lists, emojis, or other formatting that can't be spoken.
+  greeting: "(The user just connected. Greet them in one short sentence.)"
+
+tts:
+  provider: openai_compatible
+  base_url: ${TTS_BASE_URL}
+  api_key: ${VLLM_API_KEY:-}
+  model: kokoro
+  voice: af_heart
+  sample_rate: 24000
+
+interruptions:
+  enabled: true     # barge-in: user speech stops the bot mid-sentence
+  min_words: 0      # >0: only interrupt after N transcribed words (ignores "uh-huh").
+                    # With segmented Whisper STT, transcripts arrive after the user pauses,
+                    # so this makes interruptions noticeably slower.
+
+metrics:
+  enabled: true     # log per-service TTFB / processing time
